@@ -1,0 +1,74 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+
+-- 設定値
+local TARGET_SPEED = 16
+
+-- キャラクターに各種加工を施すメイン関数
+local function ApplyCustomEffects(character)
+    if not character then return end
+    
+    local humanoid = character:WaitForChild("Humanoid", 10)
+    local rootPart = character:WaitForChild("HumanoidRootPart", 10)
+    
+    if not humanoid or not rootPart then return end
+
+    -- 1. アニメーション制御スクリプトを停止
+    local animate = character:WaitForChild("Animate", 5)
+    if animate then
+        animate.Disabled = true
+    end
+
+    -- 2. 現在再生中のアニメーションをすべて強制停止
+    for _, track in pairs(humanoid:GetPlayingAnimationTracks()) do
+        track:Stop()
+    end
+
+    -- 3. 新しく再生されるアニメーションを即座に破壊する（歩行時対策）
+    humanoid.AnimationPlayed:Connect(function(track)
+        track:Stop()
+        track:Destroy()
+    end)
+
+    -- 4. スピードを32に固定
+    humanoid.WalkSpeed = TARGET_SPEED
+    
+    -- スピードが勝手に戻されないように監視
+    humanoid:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
+        if humanoid.WalkSpeed ~= TARGET_SPEED then
+            humanoid.WalkSpeed = TARGET_SPEED
+        end
+    end)
+
+    print("ID: " .. character.Name .. " に全エフェクトを適用しました。")
+end
+
+-- 【復活対応】死んで新しくキャラが出現するたびに実行
+LocalPlayer.CharacterAdded:Connect(function(newCharacter)
+    ApplyCustomEffects(newCharacter)
+end)
+
+-- 最初に実行した時の現在のキャラにも適用
+if LocalPlayer.Character then
+    ApplyCustomEffects(LocalPlayer.Character)
+end
+
+-- 【常時ループ】アニメーション停止とスピード維持の最終防衛ライン
+RunService.RenderStepped:Connect(function()
+    local char = LocalPlayer.Character
+    if char and char:FindFirstChild("Humanoid") then
+        local hum = char.Humanoid
+        -- 再生されているアニメを片っ端から止める
+        for _, track in pairs(hum:GetPlayingAnimationTracks()) do
+            track:Stop()
+        end
+        -- スピード維持
+        if hum.WalkSpeed ~= TARGET_SPEED then
+            hum.WalkSpeed = TARGET_SPEED
+        end
+    end
+end)
+
+print("--- 統合スクリプト起動完了 ---")
+print("設定: スピード32 / アニメーション無効化 / リスポーン自動適用")
